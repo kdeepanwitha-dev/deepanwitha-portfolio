@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
@@ -13,8 +14,35 @@ def index():
 @app.route("/api/contact", methods=["POST"])
 def handle_contact():
     data = request.get_json() or {}
-    submissions.append(data)
-    return jsonify({"status": "success", "message": "Message received by Python backend!"})
+    name = str(data.get("name", "")).strip()
+    email = str(data.get("email", "")).strip()
+    topic = str(data.get("topic", "General inquiry")).strip()
+    message = str(data.get("message", "")).strip()
+
+    if not name or not email or not message:
+        return jsonify({"detail": "Please fill in your name, email, and message."}), 400
+
+    entry = {
+        "name": name,
+        "email": email,
+        "topic": topic,
+        "message": message,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+    submissions.append(entry)
+
+    return jsonify({
+        "status": "success",
+        "message": f"Thanks {name}! Your message has been received and logged by the Python backend."
+    })
+
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "online",
+        "backend": "Python Flask",
+        "messages_logged": len(submissions)
+    })
 
 @app.route("/<path:path>")
 def static_files(path):
