@@ -1,3 +1,6 @@
+import os
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -6,6 +9,29 @@ app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
 
 submissions = []
+
+def send_email_notification(name, email, topic, message):
+    gmail_user = os.environ.get("GMAIL_USER")
+    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Portfolio Message from {name}: {topic}"
+    msg["From"] = gmail_user
+    msg["To"] = gmail_user
+    msg["Reply-To"] = email
+    msg.set_content(
+        f"New message from your portfolio website!\n\n"
+        f"Name: {name}\n"
+        f"Email: {email}\n"
+        f"Topic: {topic}\n\n"
+        f"Message:\n{message}\n"
+    )
+
+    with smtplib.SMTP_SSL("://gmail.com", 465) as smtp:
+        smtp.login(gmail_user, gmail_pass)
+        smtp.send_message(msg)
 
 @app.route("/")
 def index():
@@ -30,6 +56,11 @@ def handle_contact():
         "timestamp": datetime.utcnow().isoformat() + "Z"
     }
     submissions.append(entry)
+
+    try:
+        send_email_notification(name, email, topic, message)
+    except Exception as e:
+        print("Email error:", e)
 
     return jsonify({
         "status": "success",
