@@ -1,6 +1,6 @@
 import os
-import smtplib
-from email.message import EmailMessage
+import json
+import urllib.request
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -11,27 +11,37 @@ CORS(app)
 submissions = []
 
 def send_email_notification(name, email, topic, message):
+    api_key = os.environ.get("RESEND_API_KEY")
     gmail_user = os.environ.get("GMAIL_USER")
-    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
-    if not gmail_user or not gmail_pass:
+    if not api_key or not gmail_user:
         return
 
-    msg = EmailMessage()
-    msg["Subject"] = f"Portfolio Message from {name}: {topic}"
-    msg["From"] = gmail_user
-    msg["To"] = gmail_user
-    msg["Reply-To"] = email
-    msg.set_content(
-        f"New message from your portfolio website!\n\n"
-        f"Name: {name}\n"
-        f"Email: {email}\n"
-        f"Topic: {topic}\n\n"
-        f"Message:\n{message}\n"
-    )
+    payload = json.dumps({
+        "from": "Portfolio <onboarding@resend.dev>",
+        "to": [gmail_user],
+        "reply_to": email,
+        "subject": f"Portfolio Message from {name}: {topic}",
+        "text": (
+            f"New message from your portfolio website!\n\n"
+            f"Name: {name}\n"
+            f"Email: {email}\n"
+            f"Topic: {topic}\n\n"
+            f"Message:\n{message}\n"
+        )
+    }).encode("utf-8")
 
-    with smtplib.SMTP_SSL("://gmail.com", 465) as smtp:
-        smtp.login(gmail_user, gmail_pass)
-        smtp.send_message(msg)
+    req = urllib.request.Request(
+        "https://resend.com",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Portfolio-Flask-App/1.0"
+        },
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        resp.read()
 
 @app.route("/")
 def index():
